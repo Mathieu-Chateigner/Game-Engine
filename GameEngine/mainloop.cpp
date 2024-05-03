@@ -12,10 +12,15 @@
 #include "Input.h"
 #include "Engine.h"
 #include "EngineContext.h"
+#include "Scene.h"
 
 #include <iostream>
 #include <vector>
 #include <thread>
+#include <fstream>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 namespace ESGI
 {
@@ -29,6 +34,19 @@ namespace ESGI
 
 	void RecurringTimeEvent() {
 		std::cout << "Recurring Time Event\n";
+	}
+
+	void saveScene(const Scene& scene, const std::string& filename) {
+		std::ofstream file(filename);
+		json j = scene.ToJson();
+		file << j.dump(4);
+	}
+
+	Scene loadScene(const std::string& filename) {
+		std::ifstream file(filename);
+		json j;
+		file >> j;
+		return Scene::FromJson(j);
 	}
 
 	// Je nomme volontairement ces fonctions du meme nom que les classes pour souligner un point important.
@@ -59,11 +77,25 @@ namespace ESGI
 
 		bool m_needToQuit = false;
 
+		Scene* currentScene;
+
 		Application(EngineContext& context) : m_context(context) {}
 		Application() :
 			Application(Application::CreateContext())				// Depuis le C++11 un constructeur peut en appeler un autre
 		{}
 		Application(Application& app) = delete;						// une application ne peut etre dupliquee
+
+
+		Scene* Application::GetScene() const {
+			return currentScene;
+		}
+
+		void Application::SetScene(Scene* scene) {
+			if (currentScene != scene) {
+				delete currentScene;  // Supprime l'ancienne scène si nécessaire
+				currentScene = scene; // Met à jour avec la nouvelle scène
+			}
+		}
 
 
 
@@ -192,6 +224,29 @@ int main(void)
 	using namespace ESGI;
 	
 	Application gameEngine;
+
+	bool running = true;
+	std::string command;
+
+	while (running) {
+		std::cout << "Enter command (save, load, quit): ";
+		std::cin >> command;
+
+		if (command == "save") {
+			saveScene(gameEngine.GetScene(), "scene.json");
+			std::cout << "Scene saved to 'scene.json'.\n";
+		}
+		else if (command == "load") {
+			gameEngine.SetScene(loadScene("scene.json"));
+			std::cout << "Scene loaded from 'scene.json'.\n";
+		}
+		else if (command == "quit") {
+			running = false;
+		}
+		else {
+			std::cout << "Unknown command.\n";
+		}
+	}
 
 	gameEngine.Run();
 
